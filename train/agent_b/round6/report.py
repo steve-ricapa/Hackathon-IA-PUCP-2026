@@ -11,7 +11,12 @@ from train.shared.metrics import evaluate
 from .run import R6, ROOT, assert_reference, entry, protocol, reference, verify
 
 
-def report(publish=False):
+def report(publish=False,budget_diagnostic=False):
+    global ROOT
+    if budget_diagnostic:
+        if publish:
+            raise ValueError('The high-impact diagnostic may not overwrite the R6 integration manifests')
+        ROOT=R6/'agent_b'/'high_impact'/'wind25'
     proto,digest=protocol(); dev=proto['development']; state=read(ROOT/'research_state.json')
     assert state['protocol_sha256']==digest and state['reference_state_sha256']==sha(R5/'research_state.json')
     d=Development(); r5=read(R5/'research_state.json'); base={c:reference(d,c,r5) for c in dev}
@@ -19,7 +24,7 @@ def report(publish=False):
     for name,e in state['experiments'].items():
         predictions={}
         for c,s in e['cuts'].items():
-            verify(d,c,s,base[c]); meta,(p,)=aligned_predictions([ROOT/s['prediction']['path']]); assert_reference(meta,d,c)
+            verify(d,c,s,base[c],root=ROOT); meta,(p,)=aligned_predictions([ROOT/s['prediction']['path']]); assert_reference(meta,d,c)
             predictions[c]=p; baseline[c]=s['evaluation']['reference']
         for weight in (.25,.5,1.):
             cuts={}
@@ -69,4 +74,5 @@ def report(publish=False):
 
 
 if __name__=='__main__':
-    args=argparse.ArgumentParser(); args.add_argument('--publish',action='store_true'); report(args.parse_args().publish)
+    args=argparse.ArgumentParser(); args.add_argument('--publish',action='store_true')
+    args.add_argument('--budget-diagnostic',action='store_true'); a=args.parse_args(); report(a.publish,a.budget_diagnostic)

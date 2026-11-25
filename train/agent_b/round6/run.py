@@ -192,12 +192,13 @@ def entry(d,cut,pred,base):
                 extreme_threshold=threshold,groups=diagnostics(pred[m],truth[m],base[m],ds.static,threshold,t[m]))
 
 
-def verify(d,cut,summary,base):
+def verify(d,cut,summary,base,root=None):
+    root=ROOT if root is None else root
     for key in ('prediction','checkpoint'):
-        link=summary[key]; assert sha(ROOT/link['path'])==link['sha256']
-    meta,(p,)=aligned_predictions([ROOT/summary['prediction']['path']]); assert_reference(meta,d,cut)
+        link=summary[key]; assert sha(root/link['path'])==link['sha256']
+    meta,(p,)=aligned_predictions([root/summary['prediction']['path']]); assert_reference(meta,d,cut)
     np.testing.assert_array_equal(p[...,:2],base[...,:2]); assert entry(d,cut,p,base)==summary['evaluation']
-    torch.load(ROOT/summary['checkpoint']['path'],weights_only=True,map_location='cpu')
+    torch.load(root/summary['checkpoint']['path'],weights_only=True,map_location='cpu')
 
 
 def ranking(state):
