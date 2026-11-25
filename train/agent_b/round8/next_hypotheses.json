@@ -1,0 +1,7 @@
+{
+  "order": ["B1-60", "B2 at 100 and 300 matched updates", "B3 shared versus localized", "B4 only if both families pass"],
+  "confirmation": "Align three seed predictions to the three corresponding controls and score their means. Require two improved cuts and survival of each leave-one-week-out comparison.",
+  "fallback": "Inspect cold/dry bias and weekly deltas before changing temporal support or readout capacity.",
+  "resume": "OMP_NUM_THREADS=2 ../Hackathon-IA-PUCP-2026/.venv/Scripts/python.exe -B -u -m train.agent_b.round8.campaign --watch",
+  "resume_guard": "Do not start while the current B campaign process is active. Never acquire CUDA while waiting for controls."
+}
