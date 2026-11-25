@@ -7,7 +7,7 @@ import torch
 from .model import WindNet,loss
 from .physics import features
 from .run import protocol
-from .temporal import encode
+from .temporal import encode, transport
 
 
 class WindChecks(unittest.TestCase):
@@ -24,6 +24,16 @@ class WindChecks(unittest.TestCase):
             x2=x.copy(); x2[40:]+=1000
             b,_=encode(x2,times,tr,mode,(6,3,0))
             torch.testing.assert_close(a[:40],b[:40],rtol=0,atol=0)
+
+    def test_eastward_advection_uses_western_values(self):
+        lat=np.arange(4,dtype='float32')[::-1]*.25
+        lon=np.arange(6,dtype='float32')*.25
+        w=np.zeros((1,2,4,6,4),dtype='float32'); w[0,0,:,:,0]=np.arange(6)
+        flow=np.zeros_like(w)
+        flow[0,0,:,:,2]=np.deg2rad(.25)*6371000*np.cos(np.deg2rad(lat))[:,None]/3600
+        p,missing=transport(w,np.zeros((1,2),dtype=bool),(1,0),dict(gfs_lats=lat,gfs_lons=lon),flow)
+        np.testing.assert_allclose(p[0,0,:,1:,0],w[0,0,:,:-1,0],atol=1e-5)
+        self.assertFalse(missing.any())
 
     def test_upstream_period_and_calms(self):
         lat=np.arange(30,dtype='float32')*.035-10

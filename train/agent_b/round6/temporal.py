@@ -17,17 +17,43 @@ from .run import ROOT, assert_reference, protocol, reference
 ROOT=ROOT/'high_impact'/'temporal'
 DESIGNS=list(itertools.product(('absolute','anomaly','tendency'),((2,1,0),(6,3,0),(12,9,6,3,0))))
 DESIGNS.extend((mode,(2,1,0)) for mode in ('absolute-kernel','anomaly-kernel','tendency-kernel'))
+DESIGNS.extend((mode,(6,3,0)) for mode in ('transport-zero','transport'))
 PENALTIES=(.02,.10,.40)
 
 
-def encode(x,t,tr,mode,lags):
+def transport(w,m,lags,static,advect):
+    """Transport historic coarse-grid anomalies with a frozen local flow proxy."""
+    from torch.nn.functional import grid_sample
+    lat=np.asarray(static['gfs_lats']); lon=np.asarray(static['gfs_lons'])
+    if not np.allclose(np.diff(lat),np.diff(lat)[0],atol=2e-5) or not np.allclose(np.diff(lon),np.diff(lon)[0],atol=2e-5):
+        raise ValueError('Expected regular coarse-grid axes')
+    dy=np.float32(np.deg2rad(np.diff(lat).mean())*6371000)
+    dx=(np.deg2rad(np.diff(lon).mean())*6371000*np.cos(np.deg2rad(lat))).astype('float32')[:,None]
+    r,c=np.meshgrid(np.arange(len(lat),dtype='float32'),np.arange(len(lon),dtype='float32'),indexing='ij')
+    out=w.copy(); available=~m.copy()
+    for j,lag in enumerate(lags[:-1]):
+        # Backtrace with the historical GFS vector, not the diurnal anomaly.
+        past=w[:,j]; wind=advect[:,j,...,2:]
+        x=c-wind[...,0]*(3600*lag)/dx; y=r-wind[...,1]*(3600*lag)/dy
+        inside=(x>=0)&(x<=len(lon)-1)&(y>=0)&(y<=len(lat)-1)&~m[:,j,None,None]
+        grid=torch.from_numpy(np.stack([2*x/(len(lon)-1)-1,2*y/(len(lat)-1)-1],axis=-1).astype('float32'))
+        carried=grid_sample(torch.from_numpy(past).permute(0,3,1,2),grid,align_corners=True).permute(0,2,3,1).numpy()
+        out[:,j]=np.where(inside[...,None],carried,past)
+        available[:,j]=inside.reshape(len(w),-1).any(1)
+    return out,~available
+
+
+def encode(x,t,tr,mode,lags,static=None):
     nonlinear=mode.endswith('-kernel'); mode=mode.removesuffix('-kernel')
     hours=t.hour.to_numpy()
     climate=np.stack([x[tr[hours[tr]==h]].mean(0) for h in range(24)])
     assert np.isfinite(climate).all()
     source=x if mode=='absolute' else x-climate[hours]
     w,m=temporal_windows(source,t,lags)
-    if mode=='tendency':
+    if mode=='transport':
+        physical,_=temporal_windows(x,t,lags)
+        w,m=transport(w,m,lags,static,physical)
+    if mode in ('tendency','transport','transport-zero'):
         delta=np.diff(w,axis=1)/(-np.diff(lags))[None,:,None,None,None]
         delta=np.where((m[:,1:]|m[:,:-1])[:,:,None,None,None],0,delta)
         w=np.concatenate([delta,w[:,-1:]],axis=1).astype('float32')
@@ -49,7 +75,7 @@ def encode(x,t,tr,mode,lags):
 def fit(ds,tr,va,mode,lags,penalties):
     assert ds.times[tr[-1]]<ds.times[va[0]]
     stop=va[-1]+1; t=ds.times[:stop]; h=t.hour.to_numpy(); y=ds.y
-    a,fit=encode(ds.x[:stop],t,tr,mode,lags); at,av=a[tr],a[va]
+    a,fit=encode(ds.x[:stop],t,tr,mode,lags,ds.static); at,av=a[tr],a[va]
     clim=np.stack([y[tr[h[tr]==k]].mean(0) for k in range(24)])
     target=y[tr]-clim[h[tr]]; z=torch.from_numpy(dct(target,24,16).reshape(len(tr),-1))
     intercept=z.mean(0); gram=at.T@at; rhs=at.T@(z-intercept)
