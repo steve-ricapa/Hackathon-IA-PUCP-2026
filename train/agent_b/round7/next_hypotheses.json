@@ -1,0 +1,11 @@
+{
+  "status": "closed",
+  "reference": "R4/oof-0.25",
+  "handoff": ".private/experiments/round7/agent_b/DONE.json",
+  "recommendation": "No integrar para publicación: la variante compatible de viento no llegó al umbral de A.",
+  "next": [
+    "Antes de recalibrar, predefinir el KRR reloj × meteorología como especialista de V y comprobar en un período nuevo autorizado, si existe.",
+    "Investigar encogimiento parcial entre píxeles por vecindad y relieve en MOS, en lugar de seguir ajustando λ por ubicación.",
+    "Si hay capacidad, contrastar un kernel con covarianza de salidas explícita contra el kernel separable; no volver a recortar las salidas a 16 EOF como control principal."
+  ]
+}
