@@ -114,6 +114,17 @@ def nested(state):
         name=max(allowable,key=lambda k:pool([allowable[k]['cuts'][c]['score'] for c in earlier])['official'])
         result=options[name]['cuts'][cut]['score']
         out[cut]=dict(selected=name,inner=earlier,score=result,delta=result['official']-options[INCUMBENT]['cuts'][cut]['score']['official'])
+    weeks={}
+    for i,cut in enumerate(DEV):
+        def history(entry):
+            return [entry['cuts'][c]['score'] for c in DEV[:i]]+[entry['cuts'][cut]['slices']['(7, 0)']]
+        baseline=history(options[INCUMBENT]); allowable={name:entry for name,entry in options.items()
+            if all(x['official']+1e-8>=b['official'] for x,b in zip(history(entry),baseline))}
+        name=max(allowable,key=lambda k:pool(history(allowable[k]))['official'])
+        result=options[name]['cuts'][cut]['slices']['(7, 1)']
+        weeks[cut]=dict(selected=name,inner_folds=DEV[:i],inner_week=0,outer_week=1,score=result,
+                        delta=result['official']-options[INCUMBENT]['cuts'][cut]['slices']['(7, 1)']['official'])
+    out['week2_replay']=weeks
     return out
 
 
@@ -129,12 +140,13 @@ def persist(state):
 
 def run(args):
     torch.set_num_threads(3)
+    started=time.time()
     freeze=frozen_config(); prior=read(R4/'research_state.json')
     d=Development(); d.previous=prior['experiments'][INCUMBENT]['cuts']
     f=ROOT/'research_state.json'
     state=read(f) if f.exists() else dict(experiments={},parent=dict(commit='2739718',
       freeze_sha256=sha(R4/'best_config.json'),development_sha256=sha(R4/'research_state.json')),
-      started=time.time(),cap=CAP,selection='Higher pooled score, no worse cut, at least three improved calendar weeks.',
+      started=started,cap=CAP,selection='Higher pooled score, no worse cut, at least three improved seven-day blocks.',
       incumbent=dict(pooled=freeze['pooled'],cuts={c:dict(score=score(d,c,d.incumbent(c)),
           slices=slices(d,c,d.incumbent(c))) for c in DEV}))
     assert state['parent']['freeze_sha256']==sha(R4/'best_config.json')
@@ -144,6 +156,7 @@ def run(args):
             assert e['pooled']==pool([e['cuts'][c]['score'] for c in DEV])
         print(f"Verified {len(state['experiments'])} configurations; best: {ranking(state)}")
         return
+    if not f.exists(): persist(state)
     family=importlib.import_module(f'.{args.family}',__package__)
     weights=family.WEIGHTS if hasattr(family,'WEIGHTS') else (.2,.4)
     for key,spec in family.configurations():
@@ -155,6 +168,9 @@ def run(args):
             break
         start=time.perf_counter(); entries={n:{} for n,_ in remaining}
         for c in DEV:
+            if time.time()-state['started']>=180*60:
+                print('Time budget reached; verified partial results preserved.',flush=True)
+                return
             todo=[]
             for n,w in remaining:
                 s=ROOT/'runs'/n/c/'summary.json'
