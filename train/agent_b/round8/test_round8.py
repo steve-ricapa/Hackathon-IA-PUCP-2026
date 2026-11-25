@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 import numpy as np
@@ -9,7 +11,8 @@ from .control import starter
 from .mechanisms import batches,weights
 from .run import ARMS,model_for
 from .campaign import paired
-from train.agent_b.round4.run import pool
+from train.agent_b.round4.run import pool, sha, write
+from .frozen_r7 import KEY, request
 
 
 class Checks(unittest.TestCase):
@@ -48,6 +51,18 @@ class Checks(unittest.TestCase):
         for e in a: e['weeks']=[[m(1.1),m(1.)],[m(1.1),m(1.)]]
         a[0]['weeks'][0][0]=m(.1)
         self.assertFalse(paired(a)['promoted'])
+
+    def test_historical_gate_requires_exact_request(self):
+        with TemporaryDirectory() as folder:
+            freeze=Path(folder)/'FROZEN.json'; req=freeze.with_name('REQUEST_B_C3.json')
+            p=dict(integration={'freeze':str(freeze)},r7_pending={'inner_weight':.25})
+            with self.assertRaises(ValueError): request(p,'r8')
+            model={'metadata':p['r7_pending']}; doc=dict(protocol_sha256='r8',models={KEY:model},
+                proposals=[{'parts':[{'model':KEY}]}])
+            write(freeze,doc); write(req,dict(protocol_sha256='r8',frozen_sha256=sha(freeze),requested={KEY:model}))
+            self.assertEqual(request(p,'r8'),sha(freeze))
+            doc['proposals']=[]; write(freeze,doc)
+            with self.assertRaises(ValueError): request(p,'r8')
 
 
 if __name__=='__main__': unittest.main()
