@@ -1,0 +1,10 @@
+{
+  "first_wave": ["uv", "polar", "hybrid", "physics"],
+  "next_matched_comparisons": [
+    {"priority": 1, "names": ["pyramid-control", "pyramid-physics"], "criterion": "Broader spatial context reduces C0-C2 normalized U/V RMSE; compare the physics pair at fixed capacity."},
+    {"priority": 2, "names": ["polar-physics", "polar-aux", "hybrid-physics"], "criterion": "Assess whether magnitude and calm-weighted circular supervision help after changes to inputs, especially at train-defined high speeds."},
+    {"priority": 3, "names": ["spectral", "extreme", "angle"], "criterion": "Compare structure, stress-test strong winds with geographic stratification, reject tradeoffs that worsen the pooled score."}
+  ],
+  "promotion": "Confirm promising architecture with screening seed 0 plus seeds 1 and 2 under same epoch-selection policy. Publish no unconfirmed finalist. C3 only after A freezes integration.",
+  "recovery": "Rerun train.agent_b.round6.run with the same options to reuse verified per-fold results; no concurrent B writers. Inspect agent_b/research_state.json. Run report before publishing."
+}
