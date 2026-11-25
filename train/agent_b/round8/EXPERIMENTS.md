@@ -19,6 +19,8 @@ Comprobación CPU con los pesos reales de A: el adaptador inicializado a cero co
 
 Los últimos 30 días obtuvieron **0.439881** contra **0.439556** del decoder adaptado con historial completo: +0.000324. Los tres cortes avanzaron frente al control de actualizaciones extra, pero C2 apenas (+0.000002). Ambas ramas retroceden frente al starter sin ajuste (0.441886). Se publicó `CANDIDATE_READY` para confirmar el contraste, no como recomendación de integración. La comparación principal de B2 es contra las mismas actualizaciones, y la recuperación frente al starter es una segunda pregunta.
 
+La media de predicciones de las semillas 0/1/2 confirmó la ventaja frente a las mismas 100 actualizaciones: **0.454768 frente a 0.453881** (+0.000887). Deltas por semilla: +0.000324, +0.001044, +0.002313; deltas de la media por corte: +0.000957, +0.000261, +0.001422. La ventaja mínima al retirar una semana es +0.000755. Sin embargo, el starter sin ajuste, también promediando predicciones de las mismas tres semillas, da **0.455582**: B2 sigue −0.000814 por debajo. No recomendar como reemplazo del starter. RMSE de B2: 9.83114 / 0.96432 / 1.64844 / 1.48363. La evidencia apoya reducir el daño del ajuste adicional, no que ajustarlo sea mejor que no ajustarlo.
+
 R7 está congelada. `R7_HANDOFF.json` confirma hashes: C0 es R4; en C1/C2 solo V incorpora `R4 + 0.25*(clock-lags − R4)`. U, T y RH se conservan. Si A usa el artefacto tal cual (peso externo 1), no se reaplica 0.25.
 
 ## Reproducción
