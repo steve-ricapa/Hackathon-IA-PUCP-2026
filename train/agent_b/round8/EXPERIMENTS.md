@@ -15,6 +15,10 @@ Comprobación CPU con los pesos reales de A: el adaptador inicializado a cero co
 
 `B1-60` obtuvo **0.444972** frente al control **0.441886** (+0.003086). Delta C0/C1/C2: −0.000023 / −0.001042 / +0.010523. RMSE (RH/T/U/V): 10.20239 / 0.96650 / 1.67471 / 1.51218, frente a 10.14010 / 0.97970 / 1.69356 / 1.51504 del control. La ganancia agrupada sobrevive al excluir cualquier semana, pero apenas (+0.000150) en el peor caso y no cumple dos cortes favorables. No se promueve ni se atribuye el resultado a una mejora estacional general. Esta moderada ganancia en C2 acompañada de pérdidas en C0/C1 justifica los dos contrastes 30/90 para distinguir una adaptación insuficiente de una excesiva. Se verificó también la inferencia del checkpoint C0 en CPU contra la predicción guardada.
 
+### Screening B2, 100 actualizaciones (semilla 0)
+
+Los últimos 30 días obtuvieron **0.439881** contra **0.439556** del decoder adaptado con historial completo: +0.000324. Los tres cortes avanzaron frente al control de actualizaciones extra, pero C2 apenas (+0.000002). Ambas ramas retroceden frente al starter sin ajuste (0.441886). Se publicó `CANDIDATE_READY` para confirmar el contraste, no como recomendación de integración. La comparación principal de B2 es contra las mismas actualizaciones, y la recuperación frente al starter es una segunda pregunta.
+
 R7 está congelada. `R7_HANDOFF.json` confirma hashes: C0 es R4; en C1/C2 solo V incorpora `R4 + 0.25*(clock-lags − R4)`. U, T y RH se conservan. Si A usa el artefacto tal cual (peso externo 1), no se reaplica 0.25.
 
 ## Reproducción
@@ -24,6 +28,7 @@ Desde este worktree, en Bash y sin lanzar un segundo escritor simultáneo:
 ```bash
 PY=../Hackathon-IA-PUCP-2026/.venv/Scripts/python.exe
 "$PY" -B -m unittest train.agent_b.round8.test_round8
+"$PY" -B -m train.agent_b.round8.audit
 OMP_NUM_THREADS=2 "$PY" -B -u -m train.agent_b.round8.campaign --watch
 "$PY" -B -m train.agent_b.round8.run B1-60 C0 --seed 0 --output '<directorio nuevo indicado por A>'
 "$PY" -B -m train.agent_b.round8.replay B1-60 C0 --seed 0 --output '<directorio nuevo indicado por A>'
