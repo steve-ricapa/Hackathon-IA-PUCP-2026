@@ -55,9 +55,13 @@ def fit(data, cut, spec):
     z=torch.from_numpy(modes.reshape(len(tr),-1)); intercept=z.mean(0)
     x=a.T@a; x.diagonal().add_(spec['ridge']*len(tr))
     coef=torch.cholesky_solve(a.T@(z-intercept),torch.linalg.cholesky(x))
-    low=(v@coef+intercept).numpy().reshape(len(va),rows,cols,4)
-    pred=dct(low,rows,cols,inverse=True,shape=y.shape[1:3])*n.anom_sd+c
-    return pred,dict(coef=coef,intercept=intercept,mean=mean,sd=sd)
+    return decode(v,coef,intercept,spec,n,c),dict(coef=coef,intercept=intercept,mean=mean,sd=sd)
+
+
+def decode(v,coef,intercept,spec,n,c):
+    rows,cols=spec['output']
+    low=(v@coef+intercept).numpy().reshape(len(v),rows,cols,4)
+    return dct(low,rows,cols,inverse=True,shape=c.shape[1:3])*n.anom_sd+c
 
 
 def configurations():
