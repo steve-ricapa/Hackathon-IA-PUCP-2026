@@ -11,6 +11,10 @@
 
 Comprobación CPU con los pesos reales de A: el adaptador inicializado a cero conserva exactamente la salida del starter en los tres cortes; el rescore de cada control reproduce el manifiesto. Para B1-60, rangos de pesos C0/C1/C2: 0.631–1.535, 0.566–1.619 y 0.513–1.725. Tamaños efectivos descriptivos: 1514/1616, 1779/1951 y 2014/2263 horas. No son tamaños de muestra independientes.
 
+### Screening B1 (semilla 0)
+
+`B1-60` obtuvo **0.444972** frente al control **0.441886** (+0.003086). Delta C0/C1/C2: −0.000023 / −0.001042 / +0.010523. RMSE (RH/T/U/V): 10.20239 / 0.96650 / 1.67471 / 1.51218, frente a 10.14010 / 0.97970 / 1.69356 / 1.51504 del control. La ganancia agrupada sobrevive al excluir cualquier semana, pero apenas (+0.000150) en el peor caso y no cumple dos cortes favorables. No se promueve ni se atribuye el resultado a una mejora estacional general. Esta moderada ganancia en C2 acompañada de pérdidas en C0/C1 justifica los dos contrastes 30/90 para distinguir una adaptación insuficiente de una excesiva. Se verificó también la inferencia del checkpoint C0 en CPU contra la predicción guardada.
+
 R7 está congelada. `R7_HANDOFF.json` confirma hashes: C0 es R4; en C1/C2 solo V incorpora `R4 + 0.25*(clock-lags − R4)`. U, T y RH se conservan. Si A usa el artefacto tal cual (peso externo 1), no se reaplica 0.25.
 
 ## Reproducción
