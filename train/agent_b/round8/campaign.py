@@ -57,29 +57,36 @@ def publish(p,digest,state,done=False):
     for arm in order:
         peer=control_arm(arm); seeds=[s for s in range(3) if complete(arm,s) and (not peer or complete(peer,s))]
         if seeds==[0,1,2]:
-            ds=load_dataset(p['paths']['data']); ev=[]
+            ds=load_dataset(p['paths']['data']); ev=[]; intact=[]
             for c in DEV:
                 b=p['folds'][c]; tr,va=split_indices(ds.times,b['start'],b['end_exclusive']); n=Normalizer.fit(ds.x[tr],ds.y[tr],ds.times[tr].hour.to_numpy())
                 def avg(a): return np.mean([aligned_predictions([x])[1][0] for x in a],axis=0,dtype=np.float64).astype('float32')
                 def loc(a,s): return ROOT/'runs'/a/f's{s}'/c/rows[a][str(s)][c]['prediction']['path']
-                pred=avg([loc(arm,s) for s in seeds]); base=avg([loc(peer,s) if peer else rows[arm][str(s)][c]['control_source']['prediction']['path'] for s in seeds])
+                pred=avg([loc(arm,s) for s in seeds]); original=avg([rows[arm][str(s)][c]['control_source']['prediction']['path'] for s in seeds])
+                base=avg([loc(peer,s) for s in seeds]) if peer else original
                 ev.append(report_fold(ds,va,n,pred,base,b['start']))
-            confirmed[arm]=dict(**paired(ev),seed_scores=[paired(summary(rows,arm,s),summary(rows,peer,s) if peer else None) for s in seeds])
+                intact.append(report_fold(ds,va,n,pred,original,b['start']))
+            confirmed[arm]=dict(**paired(ev),versus_intact=paired(intact),seed_scores=[paired(summary(rows,arm,s),summary(rows,peer,s) if peer else None) for s in seeds])
         for s in seeds:
             entries=rows[arm][str(s)]
             models[f'{arm}-s{s}']=dict(predictions={c:f'runs/{arm}/s{s}/{c}/{v["prediction"]["path"]}' for c,v in entries.items()},
                 metadata=dict(configuration=ARMS[arm],seed=s,prediction_kind='full',prediction_type='full',artifacts=entries,
                               comparison=screening[arm],confirmation=confirmed.get(arm),
                               suggested_channels=[k for k,x,y in zip(('RH','T','U','V'),screening[arm]['candidate']['rmse'],screening[arm]['control']['rmse']) if x<y]))
+    diagnostic_models={k:v for k,v in models.items() if not (v['metadata']['confirmation'] and
+                       v['metadata']['confirmation']['promoted'] and v['metadata']['confirmation']['versus_intact']['promoted'])}
+    eligible={k:v for k,v in models.items() if k not in diagnostic_models}
+    diagnostic_models.update({k:dict(v,metadata=dict(v['metadata'],integration_recommended=False,
+                              complementarity='not evaluated',weights_applied=[])) for k,v in diagnostic_models.items()})
     state.update(screening=screening,confirmed=confirmed,screening_order=order,
                  status='DONE' if done else 'CANDIDATE_READY' if models else 'RUNNING')
     write(ROOT/'research_state.json',state)
     write(ROOT/'best_config.json',dict(screening=order[0] if order else None,
-          confirmed=max((a for a in confirmed if confirmed[a]['promoted']),key=lambda a:confirmed[a]['gain'],default=None),
+          confirmed=max((a for a in confirmed if confirmed[a]['promoted'] and confirmed[a]['versus_intact']['promoted']),key=lambda a:confirmed[a]['gain'],default=None),
           comparisons=screening,confirmation=confirmed))
     if models or done:
-        write(ROOT/('DONE.json' if done else 'CANDIDATE_READY.json'),dict(protocol_sha256=digest,status=state['status'],models=models,
-               screening=screening,confirmed=confirmed,c3='not accessed',research_state_sha256=sha(ROOT/'research_state.json')))
+        write(ROOT/('DONE.json' if done else 'CANDIDATE_READY.json'),dict(protocol_sha256=digest,status=state['status'],models=eligible,
+               diagnostic_models=diagnostic_models,screening=screening,confirmed=confirmed,c3='not accessed',research_state_sha256=sha(ROOT/'research_state.json')))
     return order
 
 
