@@ -1,7 +1,7 @@
 {
   "first_wave": ["uv", "polar", "hybrid", "physics"],
   "next_matched_comparisons": [
-    {"priority": 1, "names": ["pyramid-control", "pyramid-physics"], "criterion": "Broader spatial context reduces C0-C2 normalized U/V RMSE; compare the physics pair at fixed capacity."},
+    {"priority": 1, "names": ["diurnal-control", "diurnal-physics", "pyramid-control", "pyramid-physics"], "criterion": "The first UV control substantially trails the incumbent in C0 and its inner error is still falling. Test whether training-only spatial diurnal climatology or broader context improves U/V; compare each physics pair at fixed capacity."},
     {"priority": 2, "names": ["polar-physics", "polar-aux", "hybrid-physics"], "criterion": "Assess whether magnitude and calm-weighted circular supervision help after changes to inputs, especially at train-defined high speeds."},
     {"priority": 3, "names": ["spectral", "extreme", "angle"], "criterion": "Compare structure, stress-test strong winds with geographic stratification, reject tradeoffs that worsen the pooled score."}
   ],

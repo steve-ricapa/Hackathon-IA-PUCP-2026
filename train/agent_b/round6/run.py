@@ -34,6 +34,8 @@ SPECS={
     'spectral':('uv',True,'spectral',0.,0.),
     'extreme':('uv',True,'local',0.,.4),
     'angle':('angle',True,'local',0.,0.),
+    'diurnal-control':('uv',False,'diurnal',0.,0.),
+    'diurnal-physics':('uv',True,'diurnal',0.,0.),
 }
 
 
@@ -88,8 +90,17 @@ def statistics(x,y,idx):
     return mean,sd,y[idx].square().mean().sqrt()
 
 
-def train(x,y,tr,va,spec,seed,epochs,device,inner):
-    head,_,arch,aux,extreme=spec; mean,sd,scale=statistics(x,y,tr)
+def train(x,y,tr,va,spec,seed,epochs,device,inner,hours):
+    head,_,arch,aux,extreme=spec
+    physical=y
+    climate=None
+    if arch=='diurnal':
+        # Target decomposition learned solely from this fit's training side.
+        # This is an independent field model, not a residual of any ensemble.
+        climate=torch.stack([physical[tr[hours[tr]==h]].mean(0) for h in range(24)])
+        assert torch.isfinite(climate).all()
+        y=physical-climate[hours]
+    mean,sd,scale=statistics(x,y,tr)
     mean,sd,scale=mean.to(device),sd.to(device),scale.to(device)
     torch.random.default_generator.manual_seed(seed)
     model=WindNet(x.shape[1],24,head,arch).to(device)
@@ -115,8 +126,10 @@ def train(x,y,tr,va,spec,seed,epochs,device,inner):
         counts.append(len(indices))
     if inner: return champion,hist
     pred=infer(model,x,va,mean,sd,scale,device).transpose(0,2,3,1)
+    if climate is not None: pred=pred+climate[hours[va]].permute(0,2,3,1).numpy()
     return pred,dict(model={k:v.cpu() for k,v in model.state_dict().items()},input_mean=mean.cpu(),
-                     input_sd=sd.cpu(),wind_scale=scale.cpu(),width=24,epochs=epochs,spec=list(spec),seed=seed)
+                     input_sd=sd.cpu(),wind_scale=scale.cpu(),width=24,epochs=epochs,spec=list(spec),seed=seed,
+                     diurnal_climatology=climate)
 
 
 @torch.inference_mode()
@@ -212,8 +225,9 @@ def run(args):
             y=torch.from_numpy(d.ds.y[:len(x),...,2:].copy()).permute(0,3,1,2).contiguous()
             with (lease(proto) if args.device=='cuda' else nullcontext()):
                 device=torch.device(args.device)
-                epoch,hist=train(x,y,it,iv,spec,args.seed,args.epochs,device,True)
-                wind,fit=train(x,y,tr,va,spec,args.seed,epoch,device,False)
+                hours=times[:len(x)].hour.to_numpy()
+                epoch,hist=train(x,y,it,iv,spec,args.seed,args.epochs,device,True,hours)
+                wind,fit=train(x,y,tr,va,spec,args.seed,epoch,device,False,hours)
             full=base.copy(); full[...,2:]=wind
             if directory.exists(): directory.rename(directory.with_name(f'{cut}.partial-{time.time_ns()}'))
             out=Experiment(directory); path=directory/'best.pt'; torch.save(fit,path)
