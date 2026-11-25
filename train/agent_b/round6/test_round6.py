@@ -1,16 +1,29 @@
 import unittest
 
 import numpy as np
+import pandas as pd
 import torch
 
 from .model import WindNet,loss
 from .physics import features
 from .run import protocol
+from .temporal import encode
 
 
 class WindChecks(unittest.TestCase):
     def test_protocol(self):
         self.assertEqual(protocol()[0]['development'],['C0','C1','C2'])
+
+    def test_temporal_rejects_future_and_ignores_later_frames(self):
+        times=pd.date_range('2024-01-01',periods=72,freq='h',tz='UTC').delete(27)
+        x=np.random.default_rng(0).normal(size=(len(times),8,8,4)).astype('float32')
+        tr=np.arange(24)
+        with self.assertRaises(ValueError): encode(x,times,tr,'absolute',(1,0,-1))
+        for mode in ('absolute','anomaly','tendency'):
+            a,_=encode(x,times,tr,mode,(6,3,0))
+            x2=x.copy(); x2[40:]+=1000
+            b,_=encode(x2,times,tr,mode,(6,3,0))
+            torch.testing.assert_close(a[:40],b[:40],rtol=0,atol=0)
 
     def test_upstream_period_and_calms(self):
         lat=np.arange(30,dtype='float32')*.035-10

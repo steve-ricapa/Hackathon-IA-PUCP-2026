@@ -1,4 +1,9 @@
 {
+  "high_impact": {
+    "wind_control": "Compare C0-C2 fits capped at 25 epochs with the same trainer, inner cuts and seed. If a model is competitive, repeat seeds 1 and 2 before promotion.",
+    "temporal_gate": "Do not evaluate positive offsets on official data without a compatible approved protocol and issue-time availability evidence. Valid-time timestamps alone are insufficient.",
+    "pivot": "Short tendencies were more useful than long concatenation, but DCT and nonlinear RBF designs trailed R5. Prefer causal spatial advection or coarse-grid spectral/local fusion over more lag and kernel sweeps."
+  },
   "first_wave": ["uv", "polar", "hybrid", "physics"],
   "next_matched_comparisons": [
     {"priority": 1, "names": ["diurnal-control", "diurnal-physics", "pyramid-control", "pyramid-physics"], "criterion": "The first UV control substantially trails the incumbent in C0 and its inner error is still falling. Test whether training-only spatial diurnal climatology or broader context improves U/V; compare each physics pair at fixed capacity."},

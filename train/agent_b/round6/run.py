@@ -72,21 +72,41 @@ def reference(d,cut,r5):
 
 def input_fields(ds,stop):
     w,missing=temporal_windows(ds.x[:stop],ds.times[:stop],(2,1,0))
-    grids=[bilinear(w[:,i],ds.static) for i in range(3)]; current=grids[-1]
-    static,physics=features(ds.static,current)
     h=ds.times[:stop].hour.to_numpy()*np.pi/12
-    tags=np.column_stack([np.sin(h),np.cos(h),missing]).astype('float32')
-    tags=torch.from_numpy(tags)[:,:,None,None].expand(-1,-1,*current.shape[1:3])
-    core=torch.cat([torch.from_numpy(np.concatenate(grids,axis=-1)).permute(0,3,1,2),tags,
-                    static[None,:3].expand(stop,-1,-1,-1)],dim=1)
-    ext=torch.cat([static[None,3:].expand(stop,-1,-1,-1),physics],dim=1)
-    return core.contiguous(),ext.contiguous()
+    tags=torch.from_numpy(np.column_stack([np.sin(h),np.cos(h),missing]).astype('float32'))
+    shape=ds.static['dem'].shape; fields=None
+    for j in range(0,stop,48):
+        sl=slice(j,j+48); grids=[bilinear(w[sl,i],ds.static) for i in range(3)]
+        static,physics=features(ds.static,grids[-1]); n=len(physics)
+        core=torch.cat([torch.from_numpy(x).permute(0,3,1,2) for x in grids]+[
+            tags[sl,:,None,None].expand(-1,-1,*shape),static[None,:3].expand(n,-1,-1,-1)],1)
+        if fields is None:
+            fields=torch.empty((stop,core.shape[1]+len(static)-3+physics.shape[1],*shape))
+        k=core.shape[1]; split=k+len(static)-3
+        fields[sl,:k]=core; fields[sl,k:split]=static[None,3:]; fields[sl,split:]=physics
+    return fields,k
+
+
+class Fields:
+    def __init__(self,values,core,physics):
+        self.values=values; self.core=core; self.physics=physics
+        self.shape=values.shape
+
+    def __len__(self): return len(self.values)
+
+    def __getitem__(self,idx):
+        x=self.values[idx]
+        if not self.physics: x[:,self.core:]=0
+        return x
 
 
 def statistics(x,y,idx):
     # Train-only feature scaling. Use the same noncentered scale for both target components.
-    a=x[idx]; mean=a.mean((0,2,3),keepdim=True)
-    sd=a.std((0,2,3),unbiased=False,keepdim=True).clamp_min(.04)
+    sums=[]; squares=[]
+    for sl in np.array_split(idx,(len(idx)+47)//48):
+        a=x[sl].double(); sums.append(a.sum((0,2,3),keepdim=True)); squares.append(a.square().sum((0,2,3),keepdim=True))
+    n=len(idx)*x.shape[2]*x.shape[3]; u=sum(sums)/n
+    mean=u.float(); sd=(sum(squares)/n-u.square()).clamp_min(.04**2).sqrt().float()
     return mean,sd,y[idx].square().mean().sqrt()
 
 
@@ -190,6 +210,9 @@ def ranking(state):
 
 
 def run(args):
+    global ROOT
+    if args.budget_diagnostic:
+        ROOT=R6/'agent_b'/'high_impact'/'wind25'
     torch.set_num_threads(3); proto,digest=protocol()
     rs=ROOT/'research_state.json'; r5=read(R5/'research_state.json'); d=Development()
     for cut in proto['development']: assert d.bounds[cut]==proto['folds'][cut]
@@ -219,9 +242,9 @@ def run(args):
             inner_end=pd.Timestamp(bounds[0],tz='UTC'); inner_start=inner_end-pd.Timedelta(days=7)
             times=d.ds.times; it=tr[times[tr]<inner_start]; iv=tr[(times[tr]>=inner_start)&score_mask(times[tr])]
             assert len(iv) and times[it].max()<times[iv].min() and times[tr].max()<times[va].min()
-            core,ext=tensors(len(d.ds.times[times<pd.Timestamp(proto['folds']['C2']['end_exclusive'],tz='UTC')]))
+            fields,core=tensors(len(d.ds.times[times<pd.Timestamp(proto['folds']['C2']['end_exclusive'],tz='UTC')]))
             # Fixed feature shape and parameter count across the physics ablation.
-            x=torch.cat([core,ext if spec[1] else torch.zeros_like(ext)],dim=1)
+            x=Fields(fields,core,spec[1])
             y=torch.from_numpy(d.ds.y[:len(x),...,2:].copy()).permute(0,3,1,2).contiguous()
             with (lease(proto) if args.device=='cuda' else nullcontext()):
                 device=torch.device(args.device)
@@ -246,4 +269,5 @@ def run(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(); p.add_argument('models',choices=tuple(SPECS),nargs='*'); p.add_argument('--seed',type=int,default=0)
     p.add_argument('--epochs',type=int,default=8); p.add_argument('--device',choices=('cpu','cuda'),default='cuda')
+    p.add_argument('--budget-diagnostic',action='store_true',help='Isolate the longer high-impact diagnostic from the initial R6 writer')
     p.add_argument('--audit',action='store_true'); run(p.parse_args())
